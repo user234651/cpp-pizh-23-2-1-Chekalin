@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 
 # Название проекта
-project(OOP_Lab1)
+project(Lab1)
 
 # Стандарт C++
 set(CMAKE_CXX_STANDARD 17)
@@ -10,9 +10,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Создание исполняемого файла
 add_executable(
     Program
-    src/main.cpp
-    src/App.cpp
-    src/User.cpp
+    lib/main.cpp
+    lib/App.cpp
+    lib/User.cpp
 )
 
 # Подключение директории с заголовками
