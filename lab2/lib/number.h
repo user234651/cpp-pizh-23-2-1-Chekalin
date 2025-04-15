@@ -29,4 +29,4 @@ bool operator==(const uint2022_t& first, const uint2022_t& second);
 bool operator!=(const uint2022_t& first, const uint2022_t& second);
 
 // Вывод в консоль
-std::ostream& operator<<(std::ostream& stream, const uint2022_t& value);
+std::ostream& operator<<(std::ostream& str, const uint2022_t& val);

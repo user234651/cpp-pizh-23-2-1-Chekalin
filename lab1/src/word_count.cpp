@@ -2,7 +2,9 @@
 #include <fstream>
 #include <cctype>
 
-int countLines(const std::string& filename) {
+WordCounter::WordCounter(const std::string& filename) : filename(filename) {}
+
+int WordCounter::countLines() const {
     std::ifstream file(filename);
     int lines = 0;
     std::string line;
@@ -12,7 +14,7 @@ int countLines(const std::string& filename) {
     return lines;
 }
 
-int countWords(const std::string& filename) {
+int WordCounter::countWords() const {
     std::ifstream file(filename);
     int words = 0;
     std::string word;
@@ -22,12 +24,12 @@ int countWords(const std::string& filename) {
     return words;
 }
 
-int countBytes(const std::string& filename) {
+int WordCounter::countBytes() const {
     std::ifstream file(filename, std::ios::binary | std::ios::ate);
     return file.tellg();
 }
 
-int countChars(const std::string& filename) {
+int WordCounter::countChars() const {
     std::ifstream file(filename);
     int chars = 0;
     char c;

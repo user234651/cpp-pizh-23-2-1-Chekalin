@@ -93,15 +93,15 @@ uint2022_t operator*(const uint2022_t& first, const uint2022_t& second) {
 uint2022_t operator/(const uint2022_t& first, const uint2022_t& second) {
     if (second == from_uint(0)) return from_uint(0); // Защита от деления на ноль
 
-    uint2022_t result, remainder;
+    uint2022_t result, rem;
 
     for (int i = uint2022_t::CAPACITY * 32 - 1; i >= 0; --i) {
         // Сдвигаем остаток влево
-        remainder = remainder * from_uint(2);
-        remainder.data[0] |= (first.data[i / 32] >> (i % 32)) & 1;
+        rem = rem * from_uint(2);
+        rem.data[0] |= (first.data[i / 32] >> (i % 32)) & 1;
 
-        if (!less_than(remainder, second)) {
-            remainder = remainder - second;
+        if (!less_than(rem, second)) {
+            rem = rem - second;
             result.data[i / 32] |= (1U << (i % 32));
         }
     }
@@ -113,18 +113,18 @@ uint2022_t operator/(const uint2022_t& first, const uint2022_t& second) {
 uint2022_t operator%(const uint2022_t& first, const uint2022_t& second) {
     if (second == from_uint(0)) return from_uint(0); // Деление на ноль
 
-    uint2022_t remain;
+    uint2022_t rem;
 
     for (int i = uint2022_t::CAPACITY * 32 - 1; i >= 0; --i) {
-        remain = remain * from_uint(2);
-        remain.data[0] |= (first.data[i / 32] >> (i % 32)) & 1;
+        rem = rem * from_uint(2);
+        rem.data[0] |= (first.data[i / 32] >> (i % 32)) & 1;
 
-        if (!(less_than(remain, second))) {
-            remain = remain - second;
+        if (!less_than(rem, second)) {
+            rem = rem - second;
         }
     }
 
-    return remain;
+    return rem;
 }
 
 // Проверка на равенство
@@ -141,7 +141,7 @@ bool operator!=(const uint2022_t& first, const uint2022_t& second) {
 }
 
 // Преобразование в строку и вывод
-std::ostream& operator<<(std::ostream& stream, const uint2022_t& val) {
+std::ostream& operator<<(std::ostream& str, const uint2022_t& val) {
     uint2022_t copy = val;
     std::string result;
     uint2022_t zero = from_uint(0);
@@ -158,6 +158,6 @@ std::ostream& operator<<(std::ostream& stream, const uint2022_t& val) {
 
     // Выводим полученную строку в обычном порядке
     std::reverse(result.begin(), result.end());
-    stream << result;
-    return stream;
+    str << result;
+    return str;
 }
