@@ -5,3 +5,7 @@ name = "DemoApp"  # имя приложения (строка)
 # Настройки функций
 [features]
 enabled = true    # включить дополнительные функции
+
+# gggggg
+[university.pizh]
+student = "Albert"

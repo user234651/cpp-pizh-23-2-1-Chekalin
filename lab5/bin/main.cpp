@@ -35,6 +35,9 @@ int main(int argc, char* argv[]) {
         std::string name = cfg.Get("name").AsString();
         bool enabled = cfg.Get("features").AsSection().Get("enabled").AsBool();
 
+        std::string comment = cfg.Get("university").AsSection().Get("pizh").AsSection().Get("student").AsString();
+        std::cout << "university >> pizh >> student: " << comment << std::endl;
+
         std::cout << "Version: " << version << std::endl;
         std::cout << "Name: " << name << std::endl;
         std::cout << "Features.enable: " << (enabled ? "true" : "false") << std::endl;
