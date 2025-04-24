@@ -39,11 +39,21 @@ int main() {
     for (int i = 0; i < uint2022_t::CAPACITY; ++i) {
         max.data[i] = 0xFFFFFFFF;
     }
-    
+    uint2022_t one = from_uint(1);
+    uint2022_t two = from_uint(2);
+    uint2022_t maxMultipledOn2 = max * two;
+
     std::cout << "=== CASE WITH OVERFLOW ===" << std::endl;
     std::cout << "max = " << max << std::endl;
-    uint2022_t one = from_uint(1);
     std::cout << "max + 1 = " << max + one << std::endl;
 
+    std::cout << maxMultipledOn2 << std::endl;
+
+    if (maxMultipledOn2 == max - one) {
+        std::cout << "maxMultipledOn2 are less than max on 1." << std::endl;
+    } else {
+        std::cout << "maxMutipledOn2 are not less than max on 1." << std::endl;
+    }
+    
     return 0;
 }
