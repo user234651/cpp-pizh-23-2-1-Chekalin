@@ -34,5 +34,16 @@ int main() {
     std::cout << "a == b? " << (a == b ? "Yes" : "No") << std::endl;
     std::cout << "a != b? " << (a != b ? "Yes" : "No") << std::endl;
 
+    // Кейс с переполнением
+    uint2022_t max;
+    for (int i = 0; i < uint2022_t::CAPACITY; ++i) {
+        max.data[i] = 0xFFFFFFFF;
+    }
+    
+    std::cout << "=== CASE WITH OVERFLOW ===" << std::endl;
+    std::cout << "max = " << max << std::endl;
+    uint2022_t one = from_uint(1);
+    std::cout << "max + 1 = " << max + one << std::endl;
+
     return 0;
 }
