@@ -1,0 +1,1 @@
+add_library(ITMLparse MP3Parser.cpp)
