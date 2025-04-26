@@ -66,11 +66,3 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
-
-
-// main() is not tested here; focus is on the parser library.
-
-// int main(int argc, char** argv) {
-//     ::testing::InitGoogleTest(&argc, argv);
-//     return RUN_ALL_TESTS();
-// }

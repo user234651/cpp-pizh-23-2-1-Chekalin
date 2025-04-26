@@ -1,4 +1,4 @@
-add_executable(lab6 main.cpp)
+add_executable(lab5 main.cpp)
 
-target_link_libraries(lab6 ITMLparse)
-target_include_directories(lab6 PRIVATE ${PROJECT_SOURCE_DIR})
+target_link_libraries(lab5 ITMLparse)
+target_include_directories(lab5 PRIVATE ${PROJECT_SOURCE_DIR})
