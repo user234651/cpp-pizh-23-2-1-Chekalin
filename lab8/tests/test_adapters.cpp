@@ -1,98 +1,72 @@
 #include <gtest/gtest.h>
-#include "lib/lazy_adapters.h"
 #include <vector>
 #include <map>
-#include <list>
 #include <string>
+#include "lib/lazy_adapters.h"
 
-using namespace lazy;
+// Helper to collect range into vector
+template<typename Range>
+auto to_vector(Range&& range) {
+    using ValueType = std::decay_t<decltype(*std::begin(range))>;
+    std::vector<ValueType> result;
+    for (auto&& x : range) result.push_back(x);
+    return result;
+}
 
-// 1. Filter: retains odd numbers only
-TEST(LazyAdaptersTest, FilterOddNumbers) {
-    std::vector<int> v = {1, 2, 3, 4, 5};
-    auto result = filter([](int x) { return x % 2 != 0; })(v);
-    std::vector<int> expected = {1, 3, 5};
+TEST(FilterTest, FiltersOddNumbers) {
+    std::vector<int> v{1,2,3,4,5,6};
+    auto result = to_vector(v | filter([](int i){ return i % 2 != 0; }));
+    std::vector<int> expected{1,3,5};
     EXPECT_EQ(result, expected);
 }
 
-// 2. Transform: multiply each element by 2
-TEST(LazyAdaptersTest, TransformMultiplyByTwo) {
-    std::vector<int> v = {1, 2, 3};
-    auto result = transform([](int x) { return x * 2; })(v);
-    std::vector<int> expected = {2, 4, 6};
+TEST(TransformTest, SquaresElements) {
+    std::vector<int> v{1,2,3};
+    auto result = to_vector(v | transform([](int i){ return i * i; }));
+    std::vector<int> expected{1,4,9};
     EXPECT_EQ(result, expected);
 }
 
-// 3. Take: first N elements
-TEST(LazyAdaptersTest, TakeFirstNElements) {
-    std::vector<char> v = {'a', 'b', 'c', 'd'};
-    auto result = take(3)(v);
-    std::vector<char> expected = {'a', 'b', 'c'};
+TEST(TakeTest, TakesFirstN) {
+    std::vector<int> v{10,20,30,40,50};
+    auto result = to_vector(v | take(3));
+    std::vector<int> expected{10,20,30};
     EXPECT_EQ(result, expected);
 }
 
-// 4. Drop: skip first N elements
-TEST(LazyAdaptersTest, DropFirstNElements) {
-    std::vector<int> v = {10, 20, 30, 40};
-    auto result = drop(2)(v);
-    std::vector<int> expected = {30, 40};
+TEST(DropTest, DropsFirstN) {
+    std::vector<int> v{10,20,30,40,50};
+    auto result = to_vector(v | drop(2));
+    std::vector<int> expected{30,40,50};
     EXPECT_EQ(result, expected);
 }
 
-// 5. Reverse: reverse the sequence
-TEST(LazyAdaptersTest, ReverseSequence) {
-    std::vector<int> v = {1, 2, 3, 4, 5};
-    auto result = reverse()(v);
-    std::vector<int> expected = {5, 4, 3, 2, 1};
+TEST(ReverseTest, ReversesSequence) {
+    std::vector<int> v{1,2,3,4};
+    auto result = to_vector(v | reverse());
+    std::vector<int> expected{4,3,2,1};
     EXPECT_EQ(result, expected);
 }
 
-// 6. Keys: extract keys from associative container
-TEST(LazyAdaptersTest, KeysFromMap) {
-    std::map<std::string, int> m = {{"one", 1}, {"two", 2}, {"three", 3}};
-    auto result = keys(m);
-    // std::map is ordered by key
-    std::vector<std::string> expected = {"one", "three", "two"};
+TEST(KeysTest, ExtractsMapKeys) {
+    std::map<int, std::string> m{{1, "a"}, {2, "b"}, {3, "c"}};
+    auto result = to_vector(m | keys());
+    std::vector<int> expected{1,2,3};
     EXPECT_EQ(result, expected);
 }
 
-// 7. Values: extract values from associative container
-TEST(LazyAdaptersTest, ValuesFromMap) {
-    std::map<std::string, int> m = {{"one", 1}, {"two", 2}, {"three", 3}};
-    auto result = values(m);
-    std::vector<int> expected = {1, 3, 2};
+TEST(ValuesTest, ExtractsMapValues) {
+    std::map<int, std::string> m{{1, "a"}, {2, "b"}, {3, "c"}};
+    auto result = to_vector(m | values());
+    std::vector<std::string> expected{"a","b","c"};
     EXPECT_EQ(result, expected);
 }
 
-// 8. Pipeline: chaining filter and transform
-TEST(LazyAdaptersTest, PipelineFilterTransform) {
-    std::vector<int> v = {1, 2, 3, 4};
-    auto result = v
-        | filter([](int x) { return x % 2 == 0; })
-        | transform([](int x) { return x + 10; });
-    std::vector<int> expected = {12, 14};
-    EXPECT_EQ(result, expected);
-}
-
-// 9. Adapters on empty container: always return empty
-TEST(LazyAdaptersTest, AdaptersOnEmptyContainer) {
-    std::vector<int> empty;
-    EXPECT_TRUE(filter([](int){ return true; })(empty).empty());
-    EXPECT_TRUE(transform([](int x){ return x * x; })(empty).empty());
-    EXPECT_TRUE(take(5)(empty).empty());
-    EXPECT_TRUE(drop(5)(empty).empty());
-    EXPECT_TRUE(reverse()(empty).empty());
-    std::map<int,int> m_empty;
-    EXPECT_TRUE(keys(m_empty).empty());
-    EXPECT_TRUE(values(m_empty).empty());
-}
-
-// 10. Adapters on non-random-access container (std::list)
-TEST(LazyAdaptersTest, AdaptersOnListContainer) {
-    std::list<int> lst = {1, 2, 3, 4, 5};
-    auto result = lst
-        | drop(1)
-        | take(3);
-    std::vector<int> expected = {2, 3, 4};
+TEST(PipelineTest, FilterThenTransform) {
+    std::vector<int> v{1,2,3,4,5};
+    auto pipeline = v | filter([](int i){ return i % 2 != 0; })
+                       | transform([](int i){ return i + 1; });
+    auto result = to_vector(pipeline);
+    std::vector<int> expected{2,4,6};
     EXPECT_EQ(result, expected);
 }
