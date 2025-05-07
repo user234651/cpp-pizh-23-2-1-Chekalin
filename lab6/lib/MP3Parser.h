@@ -1,63 +1,57 @@
-/* File: lib/MP3Parser.h */
-#ifndef MP3PARSER_H
-#define MP3PARSER_H
-
-#include <iostream>
+#pragma once
+#include <cstdint>
+#include <string>
 #include <vector>
 #include <array>
 #include <memory>
-#include <string>
-#include <unordered_map>
 
-// Utility to read synchsafe integer (4 bytes)
-uint32_t readSynchSafeInteger(const std::array<unsigned char,4>& bytes);
+// Разбор и отображение фреймов ID3v2
+namespace id3 {
 
-// Base class for all ID3 frames
-class Frame {
+// Декодирует синхро-байты в целое (sync-safe integer)
+uint32_t parseSyncSafe(const std::array<unsigned char,4>& bytes);
+
+// Предварительное объявление базового класса
+class ID3Frame;
+
+// Класс текстового фрейма
+class TextID3Frame;
+
+// Класс URL-фрейма
+class UrlID3Frame;
+
+// Класс комментариев
+class CommentID3Frame;
+
+// Класс неизвестного фрейма
+class UnknownID3Frame;
+
+// Фабрика для создания соответствующего объекта по ID
+std::unique_ptr<ID3Frame> makeFrame(const std::string& id,
+                                    uint32_t length,
+                                    uint16_t flags,
+                                    const std::vector<unsigned char>& data);
+
+// Базовый абстрактный класс для фреймов
+class ID3Frame {
 public:
-    std::string id;
-    uint32_t size;
-    uint16_t flags;
-    std::vector<unsigned char> data;
+    virtual ~ID3Frame() = default;
+    // Отображает содержимое фрейма
+    virtual void display() const = 0;
 
-    Frame(const std::string& id_, uint32_t size_, uint16_t flags_, const std::vector<unsigned char>& data_);
-    virtual ~Frame() = default;
-    virtual void print() const;
+protected:
+    ID3Frame(const std::string& id, uint32_t length,
+             uint16_t flags, const std::vector<unsigned char>& data)
+        : id_(id), length_(length), flags_(flags), bytes_(data)
+    {}
+
+    std::string             id_;
+    uint32_t                length_;
+    uint16_t                flags_;
+    std::vector<unsigned char> bytes_;
 };
 
-std::string getFrameDescription(const std::string& id);
+// Описание фрейма по его идентификатору
+std::string describeFrame(const std::string& id);
 
-// Text frame: IDs starting with 'T'
-class TextFrame : public Frame {
-public:
-    TextFrame(const std::string& id_, uint32_t size_, uint16_t flags_, const std::vector<unsigned char>& data_);
-    void print() const override;
-};
-
-// URL frame: IDs starting with 'W'
-class UrlFrame : public Frame {
-public:
-    UrlFrame(const std::string& id_, uint32_t size_, uint16_t flags_, const std::vector<unsigned char>& data_);
-    void print() const override;
-};
-
-// Comment frame: COMM
-class CommentFrame : public Frame {
-public:
-    CommentFrame(const std::string& id_, uint32_t size_, uint16_t flags_, const std::vector<unsigned char>& data_);
-    void print() const override;
-};
-
-// Generic unknown frame
-class UnknownFrame : public Frame {
-public:
-    UnknownFrame(const std::string& id_, uint32_t size_, uint16_t flags_, const std::vector<unsigned char>& data_);
-};
-
-// Factory to create appropriate Frame subclass
-std::unique_ptr<Frame> createFrame(const std::string& id,
-                                   uint32_t size,
-                                   uint16_t flags,
-                                   const std::vector<unsigned char>& data);
-
-#endif // MP3PARSER_H
+} // namespace id3

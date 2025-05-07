@@ -1,34 +1,65 @@
 #include "../lib/Sandpile.h"
 #include <iostream>
 #include <filesystem>
+#include <optional>
+#include <string_view>
 
-int main() {
+int main(int argc, char* argv[]) {
     try {
-        // Задаём путь к входному файлу
-        std::string inputFile = "input/main_input.tsv";
+        // Аргументы командной строки
+        std::optional<int> numRows, numCols, iterationCap, snapshotStep;
+        std::string sourcePath, resultPath;
 
-        // Проверяем, существует ли входной файл
-        if (!std::filesystem::exists(inputFile)) {
-            std::cerr << "Файл " << inputFile << " не найден.\n";
+        for (int i = 1; i < argc; ++i) {
+            std::string_view argument = argv[i];
+            if (argument == "--length") {
+                if (++i < argc) {
+                    numRows = std::stoi(argv[i]);
+                }
+            } else if (argument == "--width") {
+                if (++i < argc) {
+                    numCols = std::stoi(argv[i]);
+                }
+            } else if (argument == "--input") {
+                if (++i < argc) {
+                    sourcePath = argv[i];
+                }
+            } else if (argument == "--output") {
+                if (++i < argc) {
+                    resultPath = argv[i];
+                }
+            } else if (argument == "--max-iter") {
+                if (++i < argc) {
+                    iterationCap = std::stoi(argv[i]);
+                }
+            } else if (argument == "--freq") {
+                if (++i < argc) {
+                    snapshotStep = std::stoi(argv[i]);
+                }
+            }
+        }
+
+        // Проверка наличия всех необходимых параметров
+        if (!numRows || !numCols || !iterationCap || !snapshotStep || sourcePath.empty() || resultPath.empty()) {
+            std::cerr << "Недостаточно параметров. Правила использования: "
+                      << argv[0] << " --length <int> --width <int> "
+                      << "--input <file> --output <dir> --max-iter <int> --freq <int>\n";
             return 1;
         }
 
-        // Создаём модель песчаной кучи размером 100x100
-        Sandpile pile(100, 100);
+        // Инициализация симулятора
+        GrainSimulator simulator(*numCols, *numRows);
 
-        // Загружаем точки из файла
-        pile.loadFromFile(inputFile);
+        // Импорт данных
+        simulator.importData(sourcePath);
 
-        // Запускаем симуляцию:
-        // максимум 100000 итераций, промежуточные результаты не сохраняются (freq = 0)
-        // имя входного файла используется для создания BMP-файла с результатом
-        pile.run(100000, 0, inputFile);
+        // Запуск симуляции
+        simulator.execute(*iterationCap, *snapshotStep, resultPath);
 
-        // Выводим сообщение об успешном завершении
-        std::cout << "Симуляция завершена. Результат сохранён в main_input.bmp\n";
-    } catch (const std::exception& e) {
-        // В случае ошибки выводим её описание
-        std::cerr << "Ошибка: " << e.what() << "\n";
+        // Уведомление об успешном завершении
+        std::cout << "Результат сохранён в " << resultPath << "\n";
+    } catch (const std::exception& ex) {
+        std::cerr << "Ошибка: " << ex.what() << "\n";
         return 1;
     }
 

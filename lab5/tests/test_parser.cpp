@@ -2,147 +2,137 @@
 #include <gtest/gtest.h>
 #include <sstream>
 
-using namespace omfl;
+using namespace confx;
 
-TEST(ParserTestSuite, EmptyTest) {
-    std::string data = "";
-    Config root = Parse(data);
-    ASSERT_TRUE(root.IsValid());
+TEST(ParserTestSuite, EmptyInput) {
+    Configuration root = Load("");
+    ASSERT_TRUE(root.Valid());
 }
 
-TEST(ParserTestSuite, IntTest) {
+TEST(ParserTestSuite, IntegerParsing) {
     std::string data = R"(
         key1 = 100500
         key2 = -22
         key3 = +28)";
-
-    Config root = Parse(data);
-    ASSERT_TRUE(root.IsValid());
-    EXPECT_TRUE(root.Get("key1").IsInt());
-    EXPECT_TRUE(root.Get("key2").IsInt());
-    EXPECT_TRUE(root.Get("key3").IsInt());
-    EXPECT_EQ(root.Get("key1").AsInt(), 100500);
-    EXPECT_EQ(root.Get("key2").AsInt(), -22);
-    EXPECT_EQ(root.Get("key3").AsInt(), 28);
+    Configuration root = Load(data);
+    ASSERT_TRUE(root.Valid());
+    EXPECT_TRUE(root.Find("key1").IsInteger());
+    EXPECT_TRUE(root.Find("key2").IsInteger());
+    EXPECT_TRUE(root.Find("key3").IsInteger());
+    EXPECT_EQ(root.Find("key1").ToInteger(), 100500);
+    EXPECT_EQ(root.Find("key2").ToInteger(), -22);
+    EXPECT_EQ(root.Find("key3").ToInteger(), 28);
 }
 
-TEST(ParserTestSuite, InvalidIntTest) {
+TEST(ParserTestSuite, InvalidIntegerAccess) {
     std::string data = R"(
         key1 = true
         key2 = -22.1
         key3 = "ITMO")";
-
-    Config root = Parse(data);
-    ASSERT_TRUE(root.IsValid());
-    EXPECT_FALSE(root.Get("key1").IsInt());
-    EXPECT_FALSE(root.Get("key2").IsInt());
-    EXPECT_FALSE(root.Get("key3").IsInt());
-    EXPECT_THROW(root.Get("key1").AsInt(), std::runtime_error);
-    EXPECT_THROW(root.Get("key2").AsInt(), std::runtime_error);
-    EXPECT_THROW(root.Get("key3").AsInt(), std::runtime_error);
+    Configuration root = Load(data);
+    ASSERT_TRUE(root.Valid());
+    EXPECT_FALSE(root.Find("key1").IsInteger());
+    EXPECT_FALSE(root.Find("key2").IsInteger());
+    EXPECT_FALSE(root.Find("key3").IsInteger());
+    EXPECT_THROW(root.Find("key1").ToInteger(), std::runtime_error);
+    EXPECT_THROW(root.Find("key2").ToInteger(), std::runtime_error);
+    EXPECT_THROW(root.Find("key3").ToInteger(), std::runtime_error);
 }
 
-TEST(ParserTestSuite, FloatTest) {
+TEST(ParserTestSuite, RealParsing) {
     std::string data = R"(
         key1 = 2.1
         key2 = -3.14
         key3 = -0.001)";
-
-    Config root = Parse(data);
-    ASSERT_TRUE(root.IsValid());
-    EXPECT_TRUE(root.Get("key1").IsFloat());
-    EXPECT_TRUE(root.Get("key2").IsFloat());
-    EXPECT_TRUE(root.Get("key3").IsFloat());
-    EXPECT_FLOAT_EQ(root.Get("key1").AsFloat(), 2.1f);
-    EXPECT_FLOAT_EQ(root.Get("key2").AsFloat(), -3.14f);
-    EXPECT_FLOAT_EQ(root.Get("key3").AsFloat(), -0.001f);
+    Configuration root = Load(data);
+    ASSERT_TRUE(root.Valid());
+    EXPECT_TRUE(root.Find("key1").IsReal());
+    EXPECT_TRUE(root.Find("key2").IsReal());
+    EXPECT_TRUE(root.Find("key3").IsReal());
+    EXPECT_FLOAT_EQ(root.Find("key1").ToReal(), 2.1f);
+    EXPECT_FLOAT_EQ(root.Find("key2").ToReal(), -3.14f);
+    EXPECT_FLOAT_EQ(root.Find("key3").ToReal(), -0.001f);
 }
 
-TEST(ParserTestSuite, InvalidFloatTest) {
+TEST(ParserTestSuite, InvalidRealAccess) {
     std::string data = R"(
         key1 = true
         key2 = -2
         key3 = "ITMO")";
-
-    Config root = Parse(data);
-    ASSERT_TRUE(root.IsValid());
-    EXPECT_FALSE(root.Get("key1").IsFloat());
-    EXPECT_FALSE(root.Get("key2").IsFloat());
-    EXPECT_FALSE(root.Get("key3").IsFloat());
-    EXPECT_THROW(root.Get("key1").AsFloat(), std::runtime_error);
-    EXPECT_THROW(root.Get("key2").AsFloat(), std::runtime_error);
-    EXPECT_THROW(root.Get("key3").AsFloat(), std::runtime_error);
+    Configuration root = Load(data);
+    ASSERT_TRUE(root.Valid());
+    EXPECT_FALSE(root.Find("key1").IsReal());
+    EXPECT_FALSE(root.Find("key2").IsReal());
+    EXPECT_FALSE(root.Find("key3").IsReal());
+    EXPECT_THROW(root.Find("key1").ToReal(), std::runtime_error);
+    EXPECT_THROW(root.Find("key2").ToReal(), std::runtime_error);
+    EXPECT_THROW(root.Find("key3").ToReal(), std::runtime_error);
 }
 
-TEST(ParserTestSuite, StringTest) {
+TEST(ParserTestSuite, TextParsing) {
     std::string data = R"(
         key = "value"
         key1 = "value1")";
-
-    Config root = Parse(data);
-    ASSERT_TRUE(root.IsValid());
-    EXPECT_TRUE(root.Get("key").IsString());
-    EXPECT_TRUE(root.Get("key1").IsString());
-    EXPECT_EQ(root.Get("key").AsString(), "value");
-    EXPECT_EQ(root.Get("key1").AsString(), "value1");
+    Configuration root = Load(data);
+    ASSERT_TRUE(root.Valid());
+    EXPECT_TRUE(root.Find("key").IsText());
+    EXPECT_TRUE(root.Find("key1").IsText());
+    EXPECT_EQ(root.Find("key").ToString(), "value");
+    EXPECT_EQ(root.Find("key1").ToString(), "value1");
 }
 
-TEST(ParserTestSuite, InvalidStringTest) {
+TEST(ParserTestSuite, InvalidTextAccess) {
     std::string data = R"(
         key = true
-        key1 = ["1", "2", "3"])";
-
-    Config root = Parse(data);
-    ASSERT_TRUE(root.IsValid());
-    EXPECT_FALSE(root.Get("key").IsString());
-    EXPECT_FALSE(root.Get("key1").IsString());
-    EXPECT_THROW(root.Get("key").AsString(), std::runtime_error);
-    EXPECT_THROW(root.Get("key1").AsString(), std::runtime_error);
+        key1 = [ "1", "2", "3" ])";
+    Configuration root = Load(data);
+    ASSERT_TRUE(root.Valid());
+    EXPECT_FALSE(root.Find("key").IsText());
+    EXPECT_FALSE(root.Find("key1").IsText());
+    EXPECT_THROW(root.Find("key").ToString(), std::runtime_error);
+    EXPECT_THROW(root.Find("key1").ToString(), std::runtime_error);
 }
 
-TEST(ParserTestSuite, ArrayTest) {
+TEST(ParserTestSuite, ListParsing) {
     std::string data = R"(
         key1 = [1, 2, 3, 4, 5, 6])";
-
-    Config root = Parse(data);
-    ASSERT_TRUE(root.IsValid());
-    EXPECT_TRUE(root.Get("key1").IsArray());
-    const auto& arr = root.Get("key1").AsArray();
-    EXPECT_EQ(arr.at(0).AsInt(), 1);
-    EXPECT_EQ(arr.at(1).AsInt(), 2);
-    EXPECT_EQ(arr.at(2).AsInt(), 3);
-    EXPECT_THROW(arr.at(100500).AsInt(), std::out_of_range);
+    Configuration root = Load(data);
+    ASSERT_TRUE(root.Valid());
+    EXPECT_TRUE(root.Find("key1").IsList());
+    const auto& arr = root.Find("key1").ToList();
+    EXPECT_EQ(arr.at(0).ToInteger(), 1);
+    EXPECT_EQ(arr.at(1).ToInteger(), 2);
+    EXPECT_EQ(arr.at(2).ToInteger(), 3);
+    EXPECT_THROW(arr.at(100500).ToInteger(), std::out_of_range);
 }
 
-TEST(ParserTestSuite, DiffTypesArrayTest) {
+TEST(ParserTestSuite, MixedTypeList) {
     std::string data = R"(
         key1 = [1, true, 3.14, "ITMO", [1, 2, 3], ["a", "b", 28]])";
-
-    Config root = Parse(data);
-    ASSERT_TRUE(root.IsValid());
-    const auto& arr = root.Get("key1").AsArray();
-    EXPECT_TRUE(arr.at(0).IsInt()); EXPECT_EQ(arr.at(0).AsInt(), 1);
-    EXPECT_TRUE(arr.at(1).IsBool()); EXPECT_EQ(arr.at(1).AsBool(), true);
-    EXPECT_TRUE(arr.at(2).IsFloat()); EXPECT_FLOAT_EQ(arr.at(2).AsFloat(), 3.14f);
-    EXPECT_TRUE(arr.at(3).IsString()); EXPECT_EQ(arr.at(3).AsString(), "ITMO");
-    const auto& sub1 = arr.at(4).AsArray();
-    EXPECT_EQ(sub1.at(0).AsInt(), 1); EXPECT_EQ(sub1.at(1).AsInt(), 2); EXPECT_EQ(sub1.at(2).AsInt(), 3);
-    const auto& sub2 = arr.at(5).AsArray();
-    EXPECT_EQ(sub2.at(0).AsString(), "a"); EXPECT_EQ(sub2.at(1).AsString(), "b"); EXPECT_EQ(sub2.at(2).AsInt(), 28);
+    Configuration root = Load(data);
+    ASSERT_TRUE(root.Valid());
+    const auto& arr = root.Find("key1").ToList();
+    EXPECT_TRUE(arr[0].IsInteger()); EXPECT_EQ(arr[0].ToInteger(), 1);
+    EXPECT_TRUE(arr[1].IsBoolean()); EXPECT_EQ(arr[1].ToBoolean(), true);
+    EXPECT_TRUE(arr[2].IsReal());    EXPECT_FLOAT_EQ(arr[2].ToReal(), 3.14f);
+    EXPECT_TRUE(arr[3].IsText());    EXPECT_EQ(arr[3].ToString(), "ITMO");
+    const auto& sub1 = arr[4].ToList();
+    EXPECT_EQ(sub1[0].ToInteger(), 1);
+    const auto& sub2 = arr[5].ToList();
+    EXPECT_EQ(sub2[0].ToString(), "a");
 }
 
-TEST(ParserTestSuite, CommentsTest) {
+TEST(ParserTestSuite, CommentHandling) {
     std::string data = R"(
         key1 = 100500  # some important value
 
-        # It's more than university)";
-
-    Config root = Parse(data);
-    ASSERT_TRUE(root.IsValid());
-    EXPECT_EQ(root.Get("key1").AsInt(), 100500);
+        # end of config)";
+    Configuration root = Load(data);
+    ASSERT_TRUE(root.Valid());
+    EXPECT_EQ(root.Find("key1").ToInteger(), 100500);
 }
 
-TEST(ParserTestSuite, SectionTest) {
+TEST(ParserTestSuite, SectionBasic) {
     std::string data = R"(
         [section1]
         key1 = 1
@@ -150,16 +140,15 @@ TEST(ParserTestSuite, SectionTest) {
 
         [section1]
         key3 = "value")";
-
-    Config root = Parse(data);
-    ASSERT_TRUE(root.IsValid());
-    const auto& sec = root.root_.Get("section1").AsSection();
-    EXPECT_EQ(sec.Get("key1").AsInt(), 1);
-    EXPECT_EQ(sec.Get("key2").AsBool(), true);
-    EXPECT_EQ(sec.Get("key3").AsString(), "value");
+    Configuration root = Load(data);
+    ASSERT_TRUE(root.Valid());
+    const Node& sec = root.root_.Find("section1").AsNode();
+    EXPECT_EQ(sec.Find("key1").ToInteger(), 1);
+    EXPECT_TRUE(sec.Find("key2").IsBoolean());
+    EXPECT_EQ(sec.Find("key3").ToString(), "value");
 }
 
-TEST(ParserTestSuite, MultiSectionTest) {
+TEST(ParserTestSuite, NestedSections) {
     std::string data = R"(
         [level1]
         key1 = 1
@@ -168,24 +157,23 @@ TEST(ParserTestSuite, MultiSectionTest) {
 
         [level1.level2-2]
         key3 = 3)";
-
-    Config root = Parse(data);
-    ASSERT_TRUE(root.IsValid());
-    const auto& lvl1 = root.root_.Get("level1").AsSection();
-    EXPECT_EQ(lvl1.Get("key1").AsInt(), 1);
-    const auto& l2a = lvl1.Get("level2-1").AsSection(); EXPECT_EQ(l2a.Get("key2").AsInt(), 2);
-    const auto& l2b = lvl1.Get("level2-2").AsSection(); EXPECT_EQ(l2b.Get("key3").AsInt(), 3);
+    Configuration root = Load(data);
+    ASSERT_TRUE(root.Valid());
+    const Node& lvl1 = root.root_.Find("level1").AsNode();
+    EXPECT_EQ(lvl1.Find("key1").ToInteger(), 1);
+    EXPECT_EQ(lvl1.Find("level2-1").AsNode().Find("key2").ToInteger(), 2);
+    EXPECT_EQ(lvl1.Find("level2-2").AsNode().Find("key3").ToInteger(), 3);
 }
 
-TEST(ParserTestSuite, GetSectionTest) {
+TEST(ParserTestSuite, DeepNestedSection) {
     std::string data = R"(
-        [level1.level2.level3]
+        [a.b.c.d]
         key1 = 1)";
-
-    Config root = Parse(data);
-    ASSERT_TRUE(root.IsValid());
-    const auto& lvl3 = root.root_.Get("level1").AsSection()
-                                .Get("level2").AsSection()
-                                .Get("level3").AsSection();
-    EXPECT_EQ(lvl3.Get("key1").AsInt(), 1);
+    Configuration root = Load(data);
+    ASSERT_TRUE(root.Valid());
+    const Node& deep = root.root_.Find("a").AsNode()
+                            .Find("b").AsNode()
+                            .Find("c").AsNode()
+                            .Find("d").AsNode();
+    EXPECT_EQ(deep.Find("key1").ToInteger(), 1);
 }

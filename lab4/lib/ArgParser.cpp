@@ -1,255 +1,298 @@
 #include "ArgParser.h"
 #include <sstream>
 
-namespace ArgumentParser {
+namespace CommandLine {
 
-ArgParser::ArgParser(const std::string& programName)
-    : programName_(programName) {}
+CmdParser::CmdParser(const std::string& name)
+    : name_(name) {}
 
-ArgParser::Option& ArgParser::CreateOption(ArgType type, char shortName, const std::string& longName, const std::string& description) {
-    options_.push_back({});
-    Option& opt = options_.back();
-    opt.type = type;
-    opt.longName = longName;
-    opt.shortName = shortName;
-    opt.description = description;
-    if (type == ArgType::Flag || type == ArgType::Help) {
-        opt.valueBool = false;
+CmdParser::Entry& CmdParser::RegisterOption(Type t, char sk,
+                                            const std::string& kn,
+                                            const std::string& d) {
+    entries_.push_back({});
+    Entry& e = entries_.back();
+    e.type = t;
+    e.keyName = kn;
+    e.keyShort = sk;
+    e.desc = d;
+    if (t == Type::Flag || t == Type::Help) {
+        e.valBool = false;
     }
-    size_t idx = options_.size() - 1;
-    if (!longName.empty()) longNameMap_[longName] = idx;
-    if (shortName) shortNameMap_[shortName] = idx;
-    return opt;
+    size_t idx = entries_.size() - 1;
+    if (!kn.empty()) longMap_[kn] = idx;
+    if (sk)       shortMap_[sk] = idx;
+    return e;
 }
 
-// ArgBuilder implementations
-ArgParser::ArgBuilder::ArgBuilder(ArgParser& parser, size_t index)
-    : parser_(parser), index_(index) {}
+// Builder implementations
+CmdParser::Builder::Builder(CmdParser& p, size_t i)
+    : parser_(p), idx_(i) {}
 
-ArgParser::ArgBuilder& ArgParser::ArgBuilder::Default(const std::string& defaultValue) {
-    auto& opt = parser_.options_[index_];
-    opt.hasDefault = true;
-    opt.defaultString = defaultValue;
+CmdParser::Builder& CmdParser::Builder::WithDefault(const std::string& dv) {
+    auto& e = parser_.entries_[idx_];
+    e.hasDefault = true;
+    e.defString = dv;
     return *this;
 }
 
-ArgParser::ArgBuilder& ArgParser::ArgBuilder::Default(int defaultValue) {
-    auto& opt = parser_.options_[index_];
-    opt.hasDefault = true;
-    opt.defaultInt = defaultValue;
+CmdParser::Builder& CmdParser::Builder::WithDefault(int dv) {
+    auto& e = parser_.entries_[idx_];
+    e.hasDefault = true;
+    e.defInt = dv;
     return *this;
 }
 
-ArgParser::ArgBuilder& ArgParser::ArgBuilder::Default(bool defaultValue) {
-    auto& opt = parser_.options_[index_];
-    opt.hasDefault = true;
-    opt.defaultBool = defaultValue;
+CmdParser::Builder& CmdParser::Builder::WithDefault(bool dv) {
+    auto& e = parser_.entries_[idx_];
+    e.hasDefault = true;
+    e.defBool = dv;
     return *this;
 }
 
-ArgParser::ArgBuilder& ArgParser::ArgBuilder::StoreValue(std::string& out) {
-    parser_.options_[index_].storeString = &out;
+CmdParser::Builder& CmdParser::Builder::SaveValue(std::string& out) {
+    parser_.entries_[idx_].ptrString = &out;
     return *this;
 }
 
-ArgParser::ArgBuilder& ArgParser::ArgBuilder::StoreValues(std::vector<std::string>& out) {
-    parser_.options_[index_].storeStrings = &out;
+CmdParser::Builder& CmdParser::Builder::SaveValues(std::vector<std::string>& out) {
+    parser_.entries_[idx_].ptrStrings = &out;
     return *this;
 }
 
-ArgParser::ArgBuilder& ArgParser::ArgBuilder::StoreValue(int& out) {
-    parser_.options_[index_].storeInt = &out;
+CmdParser::Builder& CmdParser::Builder::SaveValue(int& out) {
+    parser_.entries_[idx_].ptrInt = &out;
     return *this;
 }
 
-ArgParser::ArgBuilder& ArgParser::ArgBuilder::StoreValues(std::vector<int>& out) {
-    parser_.options_[index_].storeInts = &out;
+CmdParser::Builder& CmdParser::Builder::SaveValues(std::vector<int>& out) {
+    parser_.entries_[idx_].ptrInts = &out;
     return *this;
 }
 
-ArgParser::ArgBuilder& ArgParser::ArgBuilder::StoreValue(bool& out) {
-    parser_.options_[index_].storeBool = &out;
+CmdParser::Builder& CmdParser::Builder::SaveValue(bool& out) {
+    parser_.entries_[idx_].ptrBool = &out;
     return *this;
 }
 
-ArgParser::ArgBuilder& ArgParser::ArgBuilder::MultiValue(size_t minCount) {
-    auto& opt = parser_.options_[index_];
-    opt.multi = true;
-    opt.minCount = minCount;
+CmdParser::Builder& CmdParser::Builder::Multiple(size_t mc) {
+    auto& e = parser_.entries_[idx_];
+    e.allowMultiple = true;
+    e.minCount = mc;
     return *this;
 }
 
-ArgParser::ArgBuilder& ArgParser::ArgBuilder::Positional() {
-    parser_.options_[index_].positional = true;
+CmdParser::Builder& CmdParser::Builder::PositionalParam() {
+    parser_.entries_[idx_].isPositional = true;
     return *this;
 }
 
-// Add argument methods
-ArgParser::ArgBuilder ArgParser::AddStringArgument(const std::string& name, const std::string& description) {
-    CreateOption(ArgType::String, 0, name, description);
-    return ArgBuilder(*this, options_.size() - 1);
+// Registration shortcuts
+CmdParser::Builder CmdParser::AddStringParam(const std::string& k,
+                                             const std::string& d) {
+    RegisterOption(Type::String, 0, k, d);
+    return Builder(*this, entries_.size() - 1);
 }
-ArgParser::ArgBuilder ArgParser::AddStringArgument(char shortName, const std::string& name, const std::string& description) {
-    CreateOption(ArgType::String, shortName, name, description);
-    return ArgBuilder(*this, options_.size() - 1);
+CmdParser::Builder CmdParser::AddStringParam(char sk,
+                                             const std::string& k,
+                                             const std::string& d) {
+    RegisterOption(Type::String, sk, k, d);
+    return Builder(*this, entries_.size() - 1);
 }
-ArgParser::ArgBuilder ArgParser::AddIntArgument(const std::string& name, const std::string& description) {
-    CreateOption(ArgType::Int, 0, name, description);
-    return ArgBuilder(*this, options_.size() - 1);
+CmdParser::Builder CmdParser::AddIntParam(const std::string& k,
+                                          const std::string& d) {
+    RegisterOption(Type::Int, 0, k, d);
+    return Builder(*this, entries_.size() - 1);
 }
-ArgParser::ArgBuilder ArgParser::AddIntArgument(char shortName, const std::string& name, const std::string& description) {
-    CreateOption(ArgType::Int, shortName, name, description);
-    return ArgBuilder(*this, options_.size() - 1);
+CmdParser::Builder CmdParser::AddIntParam(char sk,
+                                          const std::string& k,
+                                          const std::string& d) {
+    RegisterOption(Type::Int, sk, k, d);
+    return Builder(*this, entries_.size() - 1);
 }
-ArgParser::ArgBuilder ArgParser::AddFlag(const std::string& name, const std::string& description) {
-    CreateOption(ArgType::Flag, 0, name, description);
-    return ArgBuilder(*this, options_.size() - 1);
+CmdParser::Builder CmdParser::AddFlagParam(const std::string& k,
+                                           const std::string& d) {
+    RegisterOption(Type::Flag, 0, k, d);
+    return Builder(*this, entries_.size() - 1);
 }
-ArgParser::ArgBuilder ArgParser::AddFlag(char shortName, const std::string& name, const std::string& description) {
-    CreateOption(ArgType::Flag, shortName, name, description);
-    return ArgBuilder(*this, options_.size() - 1);
+CmdParser::Builder CmdParser::AddFlagParam(char sk,
+                                           const std::string& k,
+                                           const std::string& d) {
+    RegisterOption(Type::Flag, sk, k, d);
+    return Builder(*this, entries_.size() - 1);
 }
-ArgParser::ArgBuilder ArgParser::AddHelp(char shortName, const std::string& name, const std::string& description) {
-    CreateOption(ArgType::Help, shortName, name, description);
-    return ArgBuilder(*this, options_.size() - 1);
+CmdParser::Builder CmdParser::AddHelpParam(char sk,
+                                           const std::string& k,
+                                           const std::string& d) {
+    RegisterOption(Type::Help, sk, k, d);
+    return Builder(*this, entries_.size() - 1);
 }
 
-// Parsing implementation
-bool ArgParser::Parse(const std::vector<std::string>& args) {
-    for (auto& opt : options_) {
-        opt.seen = false;
-        opt.valuesString.clear();
-        opt.valuesInt.clear();
+// Parsing core
+bool CmdParser::Parse(const std::vector<std::string>& args) {
+    for (auto& e : entries_) {
+        e.isSet = false;
+        e.valStrings.clear();
+        e.valInts.clear();
     }
-    helpRequested_ = false;
+    helpFlag_ = false;
 
-    Option* positionalOpt = nullptr;
-    for (auto& opt : options_) if (opt.positional) { positionalOpt = &opt; break; }
+    Entry* posEntry = nullptr;
+    for (auto& e : entries_)
+        if (e.isPositional) { posEntry = &e; break; }
 
     for (size_t i = 1; i < args.size(); ++i) {
-        const auto& arg = args[i];
-        if (arg.rfind("--", 0) == 0) {
-            if (arg == "--help") {
-                helpRequested_ = true;
+        const auto& a = args[i];
+        if (a.rfind("--", 0) == 0) {
+            if (a == "--help") {
+                helpFlag_ = true;
                 continue;
             }
-            auto posEq = arg.find('=');
-            std::string name = arg.substr(2, posEq - 2);
-            if (!longNameMap_.count(name)) return false;
-            Option* opt = &options_[longNameMap_[name]];
-            if (opt->type == ArgType::Flag) { opt->valueBool = true; opt->seen = true; }
-            else {
-                if (posEq == std::string::npos) return false;
-                std::string val = arg.substr(posEq + 1);
-                if (opt->type == ArgType::String) { if (opt->multi) opt->valuesString.push_back(val); else opt->valueString = val; }
-                else if (opt->type == ArgType::Int) { try { int v = std::stoi(val); if (opt->multi) opt->valuesInt.push_back(v); else opt->valueInt = v; } catch(...) { return false; } }
-                opt->seen = true;
-            }
-        } else if (arg.rfind("-", 0) == 0) {
-            if (arg.size() == 2 && arg[1] == 'h') { helpRequested_ = true; continue; }
-            if (arg.size() > 2 && arg[2] == '=') {
-                char sn = arg[1];
-                if (!shortNameMap_.count(sn)) return false;
-                Option* opt = &options_[shortNameMap_[sn]];
-                std::string val = arg.substr(3);
-                if (opt->type == ArgType::String) { if (opt->multi) opt->valuesString.push_back(val); else opt->valueString = val; }
-                else if (opt->type == ArgType::Int) { try { int v = std::stoi(val); if (opt->multi) opt->valuesInt.push_back(v); else opt->valueInt = v; } catch(...) { return false; } }
-                else return false;
-                opt->seen = true;
+            auto eq = a.find('=');
+            std::string key = a.substr(2, eq - 2);
+            if (!longMap_.count(key)) return false;
+            Entry* e = &entries_[longMap_[key]];
+            if (e->type == Type::Flag) {
+                e->valBool = true;
+                e->isSet = true;
             } else {
-                for (size_t k = 1; k < arg.size(); ++k) {
-                    char sn = arg[k];
-                    if (!shortNameMap_.count(sn)) return false;
-                    Option* opt = &options_[shortNameMap_[sn]];
-                    if (opt->type == ArgType::Flag) { opt->valueBool = true; opt->seen = true; }
-                    else return false;
+                if (eq == std::string::npos) return false;
+                std::string v = a.substr(eq + 1);
+                if (e->type == Type::String) {
+                    if (e->allowMultiple) e->valStrings.push_back(v);
+                    else                  e->valString = v;
+                } else if (e->type == Type::Int) {
+                    try {
+                        int iv = std::stoi(v);
+                        if (e->allowMultiple) e->valInts.push_back(iv);
+                        else                  e->valInt = iv;
+                    } catch (...) { return false; }
+                }
+                e->isSet = true;
+            }
+        } else if (a.rfind("-", 0) == 0) {
+            if (a == "-h") {
+                helpFlag_ = true;
+                continue;
+            }
+            if (a.size() > 2 && a[2] == '=') {
+                char sk = a[1];
+                if (!shortMap_.count(sk)) return false;
+                Entry* e = &entries_[shortMap_[sk]];
+                std::string v = a.substr(3);
+                if (e->type == Type::String) {
+                    if (e->allowMultiple) e->valStrings.push_back(v);
+                    else                  e->valString = v;
+                } else if (e->type == Type::Int) {
+                    try {
+                        int iv = std::stoi(v);
+                        if (e->allowMultiple) e->valInts.push_back(iv);
+                        else                  e->valInt = iv;
+                    } catch (...) { return false; }
+                } else return false;
+                e->isSet = true;
+            } else {
+                for (size_t k = 1; k < a.size(); ++k) {
+                    char sk = a[k];
+                    if (!shortMap_.count(sk)) return false;
+                    Entry* e = &entries_[shortMap_[sk]];
+                    if (e->type == Type::Flag) {
+                        e->valBool = true;
+                        e->isSet = true;
+                    } else return false;
                 }
             }
         } else {
-            if (!positionalOpt) return false;
-            Option* opt = positionalOpt;
-            if (opt->type == ArgType::String) { if (opt->multi) opt->valuesString.push_back(arg); else opt->valueString = arg; }
-            else if (opt->type == ArgType::Int) { try { int v = std::stoi(arg); if (opt->multi) opt->valuesInt.push_back(v); else opt->valueInt = v; } catch(...) { return false; } }
-            else return false;
-            opt->seen = true;
+            if (!posEntry) return false;
+            Entry* e = posEntry;
+            if (e->type == Type::String) {
+                if (e->allowMultiple) e->valStrings.push_back(a);
+                else                  e->valString = a;
+            } else if (e->type == Type::Int) {
+                try {
+                    int iv = std::stoi(a);
+                    if (e->allowMultiple) e->valInts.push_back(iv);
+                    else                  e->valInt = iv;
+                } catch (...) { return false; }
+            } else return false;
+            e->isSet = true;
         }
     }
 
-    if (helpRequested_) return true;
+    if (helpFlag_) return true;
 
-    for (auto& opt : options_) {
-        if (opt.type == ArgType::String) {
-            if (!opt.multi) {
-                if (!opt.seen) {
-                    if (opt.hasDefault) opt.valueString = opt.defaultString;
-                    else return false;
+    for (auto& e : entries_) {
+        if (e.type == Type::String) {
+            if (!e.allowMultiple) {
+                if (!e.isSet) {
+                    if (e.hasDefault) e.valString = e.defString;
+                    else              return false;
                 }
-            } else if (opt.valuesString.size() < opt.minCount) return false;
-            if (opt.storeString) *opt.storeString = opt.valueString;
-            if (opt.storeStrings) *opt.storeStrings = opt.valuesString;
-        } else if (opt.type == ArgType::Int) {
-            if (!opt.multi) {
-                if (!opt.seen) {
-                    if (opt.hasDefault) opt.valueInt = opt.defaultInt;
-                    else return false;
+            } else if (e.valStrings.size() < e.minCount) return false;
+            if (e.ptrString)  *e.ptrString  = e.valString;
+            if (e.ptrStrings) *e.ptrStrings = e.valStrings;
+        } else if (e.type == Type::Int) {
+            if (!e.allowMultiple) {
+                if (!e.isSet) {
+                    if (e.hasDefault) e.valInt = e.defInt;
+                    else              return false;
                 }
-            } else if (opt.valuesInt.size() < opt.minCount) return false;
-            if (opt.storeInt) *opt.storeInt = opt.valueInt;
-            if (opt.storeInts) *opt.storeInts = opt.valuesInt;
-        } else if (opt.type == ArgType::Flag) {
-            if (!opt.seen && opt.hasDefault) opt.valueBool = opt.defaultBool;
-            if (opt.storeBool) *opt.storeBool = opt.valueBool;
+            } else if (e.valInts.size() < e.minCount) return false;
+            if (e.ptrInt)  *e.ptrInt  = e.valInt;
+            if (e.ptrInts) *e.ptrInts = e.valInts;
+        } else if (e.type == Type::Flag) {
+            if (!e.isSet && e.hasDefault) e.valBool = e.defBool;
+            if (e.ptrBool) *e.ptrBool = e.valBool;
         }
     }
 
     return true;
 }
 
-bool ArgParser::Parse(int argc, char** argv) {
+bool CmdParser::Parse(int argc, char** argv) {
     std::vector<std::string> args(argv, argv + argc);
     return Parse(args);
 }
 
-bool ArgParser::Help() const {
-    return helpRequested_;
+bool CmdParser::ShowHelp() const {
+    return helpFlag_;
 }
 
-std::string ArgParser::HelpDescription() const {
-    std::ostringstream oss;
-    oss << programName_ << "\n";
-    return oss.str();
+std::string CmdParser::Usage() const {
+    std::ostringstream out;
+    out << name_ << "\n";
+    return out.str();
 }
 
-std::string ArgParser::GetStringValue(const std::string& name) const {
-    auto it = longNameMap_.find(name);
-    if (it == longNameMap_.end()) return {};
-    const Option& opt = options_[it->second];
-    if (!opt.multi && !opt.seen && opt.hasDefault) return opt.defaultString;
-    if (opt.multi) return opt.valuesString.empty() ? std::string() : opt.valuesString[0];
-    return opt.valueString;
+std::string CmdParser::FetchString(const std::string& k) const {
+    auto it = longMap_.find(k);
+    if (it == longMap_.end()) return {};
+    const Entry& e = entries_[it->second];
+    if (!e.allowMultiple && !e.isSet && e.hasDefault) return e.defString;
+    if (e.allowMultiple) return e.valStrings.empty() ? "" : e.valStrings[0];
+    return e.valString;
 }
 
-int ArgParser::GetIntValue(const std::string& name) const {
-    auto it = longNameMap_.find(name);
-    if (it == longNameMap_.end()) return 0;
-    const Option& opt = options_[it->second];
-    if (!opt.multi && !opt.seen && opt.hasDefault) return opt.defaultInt;
-    if (opt.multi) return opt.valuesInt.empty() ? 0 : opt.valuesInt[0];
-    return opt.valueInt;
+int CmdParser::FetchInt(const std::string& k) const {
+    auto it = longMap_.find(k);
+    if (it == longMap_.end()) return 0;
+    const Entry& e = entries_[it->second];
+    if (!e.allowMultiple && !e.isSet && e.hasDefault) return e.defInt;
+    if (e.allowMultiple) return e.valInts.empty() ? 0 : e.valInts[0];
+    return e.valInt;
 }
 
-int ArgParser::GetIntValue(const std::string& name, size_t index) const {
-    auto it = longNameMap_.find(name);
-    if (it == longNameMap_.end()) return 0;
-    const Option& opt = options_[it->second];
-    return (opt.multi && index < opt.valuesInt.size()) ? opt.valuesInt[index] : 0;
+int CmdParser::FetchInt(const std::string& k, size_t idx) const {
+    auto it = longMap_.find(k);
+    if (it == longMap_.end()) return 0;
+    const Entry& e = entries_[it->second];
+    return (e.allowMultiple && idx < e.valInts.size()) ? e.valInts[idx] : 0;
 }
 
-bool ArgParser::GetFlag(const std::string& name) const {
-    auto it = longNameMap_.find(name);
-    if (it == longNameMap_.end()) return false;
-    const Option& opt = options_[it->second];
-    return opt.seen ? opt.valueBool : (opt.hasDefault ? opt.defaultBool : false);
+bool CmdParser::FetchFlag(const std::string& k) const {
+    auto it = longMap_.find(k);
+    if (it == longMap_.end()) return false;
+    const Entry& e = entries_[it->second];
+    return e.isSet ? e.valBool : (e.hasDefault ? e.defBool : false);
 }
 
-} // namespace ArgumentParser
+} // namespace CommandLine

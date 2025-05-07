@@ -3,7 +3,7 @@
 #include <string>
 #include <cstdint>
 
-class BmpWriter {
+class BitmapExporter {
 public:
-    static void writeBMP(const std::string& filename, const std::vector<std::vector<uint64_t>>& field);
+    static void exportBitmap(const std::string& outputPath, const std::vector<std::vector<uint64_t>>& gridData);
 };

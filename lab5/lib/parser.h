@@ -1,69 +1,76 @@
 #pragma once
+
 #include <string>
 #include <vector>
 #include <map>
 
-namespace omfl {
-    class Section;
+namespace confx {
 
-    class Value {
-    public:
-        // Type checks
-        bool IsInt() const;
-        bool IsFloat() const;
-        bool IsBool() const;
-        bool IsString() const;
-        bool IsArray() const;
-        bool IsSection() const;
+// Forward
+class Element;
 
-        // Accessors
-        int AsInt() const;
-        float AsFloat() const;
-        bool AsBool() const;
-        const std::string& AsString() const;
-        const std::vector<Value>& AsArray() const;
-        const Section& AsSection() const;
+// Node holds subsections & values
+class Node {
+public:
+    const Element& Find(const std::string& key) const;
+    bool            Exists(const std::string& key) const;
 
-        // Constructors for internal use
-        static Value CreateInt(int v);
-        static Value CreateFloat(float v);
-        static Value CreateBool(bool v);
-        static Value CreateString(const std::string& v);
-        static Value CreateArray(const std::vector<Value>& v);
-        static Value CreateSection(const Section& sec);
+    // storage for parser
+    std::map<std::string, Element> items_;
+};
 
-    private:
-        enum class Type { INT, FLOAT, BOOL, STRING, ARRAY, SECTION, NONE } type_{Type::NONE};
-        int int_{};
-        float float_{};
-        bool bool_{};
-        std::string string_;
-        std::vector<Value> array_;
-        Section* section_{}; // pointer to owned Section in memory
-    };
+// Element wraps any OMFL value
+class Element {
+public:
+    // Type queries
+    bool IsInteger()  const;
+    bool IsReal()     const;
+    bool IsBoolean()  const;
+    bool IsText()     const;
+    bool IsList()     const;
+    bool IsNode()     const;
 
-    class Section {
-    public:
-        // Get a value (or subsection) by key
-        const Value& Get(const std::string& key) const;
-        bool Has(const std::string& key) const;
+    // Value access
+    int                      ToInteger()  const;
+    float                    ToReal()     const;
+    bool                     ToBoolean()  const;
+    const std::string&       ToString()   const;
+    const std::vector<Element>& ToList()  const;
+    const Node&              AsNode()     const;
 
-        // Internal storage made public for parser implementation
-        std::map<std::string, Value> values_;
-    };
+    // Internal constructors
+    static Element MakeInteger(int v);
+    static Element MakeReal(float v);
+    static Element MakeBoolean(bool v);
+    static Element MakeText(const std::string& v);
+    static Element MakeList(const std::vector<Element>& v);
+    static Element MakeNode(const Node& n);
 
-    class Config {
-    public:
-        bool valid = false;
-        bool IsValid() const { return valid; }
+private:
+    enum class Kind { INTEGER, REAL, BOOLEAN, TEXT, LIST, NODE, NONE } kind_{Kind::NONE};
 
-        const Value& Get(const std::string& key) const;
-        bool Has(const std::string& key) const;
+    int valueInt_{};
+    float valueReal_{};
+    bool valueBool_{};
+    std::string valueStr_;
+    std::vector<Element> valueList_;
+    Node* nodePtr_{};
+};
 
-        // Root section exposed for parser implementation
-        Section root_;
-    };
+// Whole–config with root node
+class Configuration {
+public:
+    bool ok_{false};
+    bool Valid() const { return ok_; }
 
-    // Parse an OMFL config from string
-    Config Parse(const std::string& str);
-}
+    const Element& Find(const std::string& key) const;
+    bool            Exists(const std::string& key) const;
+
+    // for parser
+    Node root_;
+};
+
+// Load OMFL text into Configuration
+Configuration Load(const std::string& text);
+
+} // namespace confx

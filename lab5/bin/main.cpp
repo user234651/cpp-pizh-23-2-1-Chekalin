@@ -3,46 +3,55 @@
 #include <sstream>
 #include "lib/parser.h"
 
-using namespace omfl; // подключаем пространство имён для удобства
+using namespace confx;
 
 int main(int argc, char* argv[]) {
-    // Determine config file path
-    std::string path = "../example/config.omfl";
+    // Determine path to config file
+    std::string filePath = "../example/config.omfl";
     if (argc > 1) {
-        path = argv[1];
+        filePath = argv[1];
     }
 
-    // Read file content
-    std::ifstream file(path);
-    if (!file) {
-        std::cerr << "Failed to open config file: " << path << std::endl;
+    // Read entire file
+    std::ifstream in(filePath);
+    if (!in) {
+        std::cerr << "Unable to open config: " << filePath << std::endl;
         return 1;
     }
-    std::ostringstream ss;
-    ss << file.rdbuf();
-    std::string content = ss.str();
+    std::ostringstream buf;
+    buf << in.rdbuf();
+    std::string text = buf.str();
 
-    // Parse OMFL config
-    Config cfg = Parse(content);
-    if (!cfg.IsValid()) {
-        std::cerr << "Config parsing failed." << std::endl;
+    // Load config
+    Configuration config = Load(text);
+    if (!config.Valid()) {
+        std::cerr << "Config load failed." << std::endl;
         return 2;
     }
 
-    // Example: retrieve values
     try {
-        int version = cfg.Get("version").AsInt();
-        std::string name = cfg.Get("name").AsString();
-        bool enabled = cfg.Get("features").AsSection().Get("enabled").AsBool();
+        int rev       = config.Find("rev").ToInteger();
+        std::string title  = config.Find("title").ToString();
+        bool on        = config
+                            .Find("functions")
+                            .AsNode()
+                            .Find("on")
+                            .ToBoolean();
 
-        std::string comment = cfg.Get("university").AsSection().Get("pizh").AsSection().Get("student").AsString();
-        std::cout << "university >> pizh >> student: " << comment << std::endl;
+        std::string learner = config
+                            .Find("institute")
+                            .AsNode()
+                            .Find("division")
+                            .AsNode()
+                            .Find("learner")
+                            .ToString();
 
-        std::cout << "Version: " << version << std::endl;
-        std::cout << "Name: " << name << std::endl;
-        std::cout << "Features.enable: " << (enabled ? "true" : "false") << std::endl;
+        std::cout << "institute >> division >> learner: " << learner << std::endl;
+        std::cout << "Rev: "   << rev   << std::endl;
+        std::cout << "Title: " << title << std::endl;
+        std::cout << "Functions.on: " << (on ? "true" : "false") << std::endl;
     } catch (const std::exception& e) {
-        std::cerr << "Error accessing config values: " << e.what() << std::endl;
+        std::cerr << "Error querying config: " << e.what() << std::endl;
         return 3;
     }
 

@@ -1,92 +1,117 @@
 #include "MP3Parser.h"
-#include <map>
-#include <cstring>
+#include <iostream>
+#include <unordered_map>
 #include <algorithm>
+#include <cstring>
 
-uint32_t readSynchSafeInteger(const std::array<unsigned char,4>& bytes) {
-    uint32_t value = 0;
+namespace id3 {
+
+// ----------- parseSyncSafe implementation ------------
+uint32_t parseSyncSafe(const std::array<unsigned char,4>& bytes) {
+    uint32_t result = 0;
     for (int i = 0; i < 4; ++i) {
-        value = (value << 7) | (bytes[i] & 0x7F);
+        result = (result << 7) | (bytes[i] & 0x7F);
     }
-    return value;
+    return result;
 }
 
-Frame::Frame(const std::string& id_, uint32_t size_, uint16_t flags_, const std::vector<unsigned char>& data_)
-    : id(id_), size(size_), flags(flags_), data(data_) {}
-
-void Frame::print() const {
-    std::cout << id << " (" << size << " bytes)";
-}
-
-std::string getFrameDescription(const std::string& id) {
-    static const std::unordered_map<std::string, std::string> descriptions = {
-        {"TIT2", "Название"}, {"TPE1", "Исполнитель"}, {"TALB", "Альбом"},
-        {"TRCK", "Номер трека"}, {"TYER", "Год"}, {"TDRC", "Дата релиза"},
-        {"TCON", "Жанр"}, {"COMM", "Комментарий"}, {"TENC", "Программа кодирования"},
-        {"TCOM", "Композитор"}, {"TBPM", "Темп (BPM)"}, {"TSSE", "Программа кодирования"},
-        {"TPOS", "Номер диска"}
+// ----------- describeFrame implementation ------------
+std::string describeFrame(const std::string& id) {
+    static const std::unordered_map<std::string,std::string> mapDescr = {
+        {"TIT2","Название"},   {"TPE1","Исполнитель"},
+        {"TALB","Альбом"},     {"TRCK","Номер трека"},
+        {"TYER","Год"},        {"TDRC","Дата релиза"},
+        {"TCON","Жанр"},       {"COMM","Комментарий"},
+        {"TENC","Кодировщик"}, {"TCOM","Композитор"},
+        {"TBPM","Темп"},       {"TSSE","Программа"},
+        {"TPOS","Номер диска"}
     };
-    auto it = descriptions.find(id);
-    return it != descriptions.end() ? it->second : "";
+    auto it = mapDescr.find(id);
+    return it != mapDescr.end() ? it->second : "";
 }
 
-TextFrame::TextFrame(const std::string& id_, uint32_t size_, uint16_t flags_, const std::vector<unsigned char>& data_)
-    : Frame(id_, size_, flags_, data_) {}
+// ----------- ID3Frame ctor (определение) ------------
+ID3Frame::ID3Frame(const std::string& id, uint32_t length,
+                   uint16_t flags, const std::vector<unsigned char>& data)
+    : id_(id), length_(length), flags_(flags), bytes_(data) {}
 
-void TextFrame::print() const {
-    std::string text;
-    if (!data.empty()) {
-        unsigned char enc = data[0];
-        text.assign(data.begin() + 1, data.end());
+// ----------- TextID3Frame implementation ------------
+class TextID3Frame : public ID3Frame {
+public:
+    using ID3Frame::ID3Frame;
+    void display() const override {
+        std::string txt;
+        if (!bytes_.empty()) {
+            // первый байт — кодировка
+            txt.assign(bytes_.begin() + 1, bytes_.end());
+        }
+        std::string desc = describeFrame(id_);
+        std::cout << id_;
+        if (!desc.empty()) std::cout << " (" << desc << ")";
+        std::cout << ": " << txt;
     }
-    std::string desc = getFrameDescription(id);
-    std::cout << id;
-    if (!desc.empty()) std::cout << " (" << desc << ")";
-    std::cout << ": " << text;
-}
+};
 
-UrlFrame::UrlFrame(const std::string& id_, uint32_t size_, uint16_t flags_, const std::vector<unsigned char>& data_)
-    : Frame(id_, size_, flags_, data_) {}
-
-void UrlFrame::print() const {
-    std::string url(data.begin(), data.end());
-    std::string desc = getFrameDescription(id);
-    std::cout << id;
-    if (!desc.empty()) std::cout << " (" << desc << ")";
-    std::cout << " (URL): " << url;
-}
-
-CommentFrame::CommentFrame(const std::string& id_, uint32_t size_, uint16_t flags_, const std::vector<unsigned char>& data_)
-    : Frame(id_, size_, flags_, data_) {}
-
-void CommentFrame::print() const {
-    if (data.size() < 4) {
-        std::cout << id << ": <invalid COMM frame>";
-        return;
+// ----------- UrlID3Frame implementation ------------
+class UrlID3Frame : public ID3Frame {
+public:
+    using ID3Frame::ID3Frame;
+    void display() const override {
+        std::string url(bytes_.begin(), bytes_.end());
+        std::string desc = describeFrame(id_);
+        std::cout << id_;
+        if (!desc.empty()) std::cout << " (" << desc << ")";
+        std::cout << " (URL): " << url;
     }
-    unsigned char enc = data[0];
-    std::string language(reinterpret_cast<const char*>(&data[1]), 3);
-    size_t pos = 4;
-    while (pos < data.size() && data[pos] != 0) ++pos;
-    ++pos;
-    std::string text(data.begin() + pos, data.end());
-    std::string desc = getFrameDescription(id);
-    std::cout << id;
-    if (!desc.empty()) std::cout << " (" << desc << ")";
-    std::cout << " [" << language << "]: " << text;
-}
+};
 
-UnknownFrame::UnknownFrame(const std::string& id_, uint32_t size_, uint16_t flags_, const std::vector<unsigned char>& data_)
-    : Frame(id_, size_, flags_, data_) {}
+// ----------- CommentID3Frame implementation ------------
+class CommentID3Frame : public ID3Frame {
+public:
+    using ID3Frame::ID3Frame;
+    void display() const override {
+        if (bytes_.size() < 4) {
+            std::cout << id_ << ": <некорректный COMM>";
+            return;
+        }
+        // bytes_[0] — кодировка, [1..3] — язык
+        std::string lang(reinterpret_cast<const char*>(&bytes_[1]), 3);
+        size_t pos = 4;
+        // пропускаем пустой дескриптор
+        while (pos < bytes_.size() && bytes_[pos] != 0) ++pos;
+        ++pos;
+        std::string txt(bytes_.begin() + pos, bytes_.end());
+        std::string desc = describeFrame(id_);
+        std::cout << id_;
+        if (!desc.empty()) std::cout << " (" << desc << ")";
+        std::cout << " [" << lang << "]: " << txt;
+    }
+};
 
-std::unique_ptr<Frame> createFrame(const std::string& id, uint32_t size, uint16_t flags, const std::vector<unsigned char>& data) {
+// ----------- UnknownID3Frame implementation ------------
+class UnknownID3Frame : public ID3Frame {
+public:
+    using ID3Frame::ID3Frame;
+    void display() const override {
+        std::cout << id_ << " (" << length_ << " bytes)";
+    }
+};
+
+// ----------- makeFrame factory ------------
+std::unique_ptr<ID3Frame> makeFrame(const std::string& id,
+                                    uint32_t length,
+                                    uint16_t flags,
+                                    const std::vector<unsigned char>& data) {
     if (!id.empty() && id[0] == 'T') {
-        return std::make_unique<TextFrame>(id, size, flags, data);
-    } else if (!id.empty() && id[0] == 'W') {
-        return std::make_unique<UrlFrame>(id, size, flags, data);
-    } else if (id == "COMM") {
-        return std::make_unique<CommentFrame>(id, size, flags, data);
-    } else {
-        return std::make_unique<UnknownFrame>(id, size, flags, data);
+        return std::make_unique<TextID3Frame>(id, length, flags, data);
     }
+    if (!id.empty() && id[0] == 'W') {
+        return std::make_unique<UrlID3Frame>(id, length, flags, data);
+    }
+    if (id == "COMM") {
+        return std::make_unique<CommentID3Frame>(id, length, flags, data);
+    }
+    return std::make_unique<UnknownID3Frame>(id, length, flags, data);
 }
+
+} // namespace id3

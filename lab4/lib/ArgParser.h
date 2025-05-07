@@ -1,105 +1,104 @@
-// ArgParser.h
 #pragma once
 
 #include <string>
 #include <vector>
 #include <unordered_map>
 
-namespace ArgumentParser {
+namespace CommandLine {
 
-class ArgParser {
+class CmdParser {
 public:
-    ArgParser(const std::string& programName);
+    explicit CmdParser(const std::string& name);
 
-    // Parse from argc/argv or a vector of strings
+    // Parsing entrypoints
     bool Parse(int argc, char** argv);
     bool Parse(const std::vector<std::string>& args);
 
-    // Check if help was requested
-    bool Help() const;
+    // Help/usage
+    bool ShowHelp() const;
+    std::string Usage() const;
 
-    // Generate help description
-    std::string HelpDescription() const;
+    // Fetch parsed values
+    std::string FetchString(const std::string& key) const;
+    int         FetchInt(const std::string& key) const;
+    int         FetchInt(const std::string& key, size_t idx) const;
+    bool        FetchFlag(const std::string& key) const;
 
-    // Retrieve parsed values
-    std::string GetStringValue(const std::string& name) const;
-    int GetIntValue(const std::string& name) const;
-    int GetIntValue(const std::string& name, size_t index) const;
-    bool GetFlag(const std::string& name) const;
+    // Builder
+    class Builder;
 
-    // Builder for defining arguments
-    class ArgBuilder;
+    // Registration methods
+    Builder AddStringParam(const std::string& key, const std::string& desc = "");
+    Builder AddStringParam(char shortKey, const std::string& key, const std::string& desc = "");
 
-    // Add different kinds of arguments
-    ArgBuilder AddStringArgument(const std::string& name, const std::string& description = "");
-    ArgBuilder AddStringArgument(char shortName, const std::string& name, const std::string& description = "");
+    Builder AddIntParam(const std::string& key, const std::string& desc = "");
+    Builder AddIntParam(char shortKey, const std::string& key, const std::string& desc = "");
 
-    ArgBuilder AddIntArgument(const std::string& name, const std::string& description = "");
-    ArgBuilder AddIntArgument(char shortName, const std::string& name, const std::string& description = "");
+    Builder AddFlagParam(const std::string& key, const std::string& desc = "");
+    Builder AddFlagParam(char shortKey, const std::string& key, const std::string& desc = "");
 
-    ArgBuilder AddFlag(const std::string& name, const std::string& description = "");
-    ArgBuilder AddFlag(char shortName, const std::string& name, const std::string& description = "");
-
-    ArgBuilder AddHelp(char shortName, const std::string& name, const std::string& description);
+    Builder AddHelpParam(char shortKey, const std::string& key, const std::string& desc);
 
 private:
-    std::string programName_;
-    bool helpRequested_ = false;
+    std::string name_;
+    bool helpFlag_ = false;
 
-    enum class ArgType { String, Int, Flag, Help };
-    struct Option {
-        ArgType type;
-        std::string longName;
-        char shortName;
-        std::string description;
-        bool positional = false;
-        bool multi = false;
+    enum class Type { String, Int, Flag, Help };
+    struct Entry {
+        Type type;
+        std::string keyName;
+        char keyShort;
+        std::string desc;
+        bool isPositional = false;
+        bool allowMultiple = false;
         size_t minCount = 0;
-        bool seen = false;
+        bool isSet = false;
         bool hasDefault = false;
-        std::string defaultString;
-        int defaultInt = 0;
-        bool defaultBool = false;
-        std::string valueString;
-        std::vector<std::string> valuesString;
-        int valueInt = 0;
-        std::vector<int> valuesInt;
-        bool valueBool = false;
-        std::string* storeString = nullptr;
-        std::vector<std::string>* storeStrings = nullptr;
-        int* storeInt = nullptr;
-        std::vector<int>* storeInts = nullptr;
-        bool* storeBool = nullptr;
+        std::string defString;
+        int defInt = 0;
+        bool defBool = false;
+        std::string valString;
+        std::vector<std::string> valStrings;
+        int valInt = 0;
+        std::vector<int> valInts;
+        bool valBool = false;
+        std::string* ptrString = nullptr;
+        std::vector<std::string>* ptrStrings = nullptr;
+        int* ptrInt = nullptr;
+        std::vector<int>* ptrInts = nullptr;
+        bool* ptrBool = nullptr;
     };
 
-    std::vector<Option> options_;
-    std::unordered_map<std::string, size_t> longNameMap_;
-    std::unordered_map<char, size_t> shortNameMap_;
+    std::vector<Entry> entries_;
+    std::unordered_map<std::string, size_t> longMap_;
+    std::unordered_map<char, size_t> shortMap_;
 
-    Option& CreateOption(ArgType type, char shortName, const std::string& longName, const std::string& description);
+    Entry& RegisterOption(Type type, char shortKey,
+                          const std::string& keyName,
+                          const std::string& desc);
 
 public:
-    class ArgBuilder {
+    class Builder {
     public:
-        ArgBuilder(ArgParser& parser, size_t index);
+        Builder(CmdParser& parent, size_t idx);
 
-        ArgBuilder& Default(const std::string& defaultValue);
-        ArgBuilder& Default(int defaultValue);
-        ArgBuilder& Default(bool defaultValue);
+        Builder& WithDefault(const std::string& defVal);
+        Builder& WithDefault(int defVal);
+        Builder& WithDefault(bool defVal);
 
-        ArgBuilder& StoreValue(std::string& out);
-        ArgBuilder& StoreValues(std::vector<std::string>& out);
-        ArgBuilder& StoreValue(int& out);
-        ArgBuilder& StoreValues(std::vector<int>& out);
-        ArgBuilder& StoreValue(bool& out);
+        Builder& SaveValue(std::string& out);
+        Builder& SaveValues(std::vector<std::string>& out);
+        Builder& SaveValue(int& out);
+        Builder& SaveValues(std::vector<int>& out);
+        Builder& SaveValue(bool& out);
 
-        ArgBuilder& MultiValue(size_t minCount = 0);
-        ArgBuilder& Positional();
+        Builder& Multiple(size_t minCount = 0);
+        Builder& PositionalParam();
 
     private:
-        ArgParser& parser_;
-        size_t index_;
+        CmdParser& parser_;
+        size_t idx_;
     };
 };
 
-} // namespace ArgumentParser
+} // namespace CommandLine

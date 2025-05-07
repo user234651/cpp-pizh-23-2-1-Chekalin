@@ -1,11 +1,11 @@
 # Основные параметры приложения
-version = 1        # версия приложения (целое число)
-name = "DemoApp"  # имя приложения (строка)
+rev = 1           # версия приложения (целое число)
+title = "DemoApp" # имя приложения (строка)
 
 # Настройки функций
-[features]
-enabled = true    # включить дополнительные функции
+[functions]
+on = true         # включить дополнительные функции
 
 # gggggg
-[university.pizh]
-student = "Albert"
+[institute.division]
+learner = "Egor"

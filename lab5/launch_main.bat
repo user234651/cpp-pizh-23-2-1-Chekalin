@@ -2,7 +2,7 @@
 chcp 65001 >nul
 setlocal enabledelayedexpansion
 
-build\bin\lab6.exe example/config.omfl
+build\bin\lab5.exe example/config.omfl
 echo.
 
 pause
