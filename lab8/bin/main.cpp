@@ -4,55 +4,50 @@
 #include "lib/lazy_adapters.h"
 
 int main() {
-    std::vector<int> v = {1,2,3,4,5,6};
-    
-    // Фильтр + трансформация (квадраты нечётных)
-    auto pipeline = v 
-        | filter([](int x) { return x % 2 == 1; })
-        | transform([](int x) { return x * x; });
-    std::cout << "Filter + Transform: ";
-    for(int x : pipeline) {
-        std::cout << x << " "; // 1 9 25
+    std::vector<int> numbers = {1, 2, 3, 4, 5, 6};
+
+    // Отбор нечётных и возведение в квадрат
+    auto sequence = numbers 
+        | pick_if([](int n) { return n % 2 == 1; })
+        | apply([](int n) { return n * n; });
+
+    std::cout << "Odd Squares: ";
+    for (int n : sequence) {
+        std::cout << n << " "; // 1 9 25
     }
 
-    // Take — взять первые 4 элемента исходного
-    std::cout << "\nTake 4: ";
-    for(auto x : v | take(4)) {
-        std::cout << x << " "; // 1 2 3 4
+    std::cout << "\nFirst 4 items: ";
+    for (auto n : numbers | first(4)) {
+        std::cout << n << " "; // 1 2 3 4
     }
 
-    // Drop — пропустить первые 2 элемента
-    std::cout << "\nDrop 2: ";
-    for(auto x : v | drop(2)) {
-        std::cout << x << " "; // 3 4 5 6
+    std::cout << "\nSkip first 2: ";
+    for (auto n : numbers | skip(2)) {
+        std::cout << n << " "; // 3 4 5 6
     }
 
-    // Reverse — реверс
-    std::cout << "\nReverse: ";
-    for(auto x : v | reverse()) {
-        std::cout << x << " "; // 6 5 4 3 2 1
+    std::cout << "\nReversed: ";
+    for (auto n : numbers | backwards()) {
+        std::cout << n << " "; // 6 5 4 3 2 1
     }
 
-    // Комбинация: реверс + take
-    std::cout << "\nReverse + Take 3: ";
-    for(auto x : v | reverse() | take(3)) {
-        std::cout << x << " "; // 6 5 4
+    std::cout << "\nReversed + First 3: ";
+    for (auto n : numbers | backwards() | first(3)) {
+        std::cout << n << " "; // 6 5 4
     }
 
-    // Словарь: ключи и значения
-    std::map<int, std::string> m = {{1, "one"}, {2, "two"}, {3, "three"}};
+    std::map<int, std::string> dictionary = {{1, "one"}, {2, "two"}, {3, "three"}};
 
-    std::cout << "\nKeys: ";
-    for(auto k : m | keys()) {
+    std::cout << "\nMap Keys: ";
+    for (auto k : dictionary | get_keys()) {
         std::cout << k << " "; // 1 2 3
     }
 
-    std::cout << "\nValues: ";
-    for(auto val : m | values()) {
+    std::cout << "\nMap Values: ";
+    for (auto val : dictionary | get_values()) {
         std::cout << val << " "; // one two three
     }
 
     std::cout << "\n";
-
     return 0;
 }

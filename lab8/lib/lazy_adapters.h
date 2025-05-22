@@ -1,333 +1,287 @@
-// lib/adapters.h
-
-#ifndef ADAPTERS_H
-#define ADAPTERS_H
+#ifndef LAZY_PIPE_ADAPTERS_H
+#define LAZY_PIPE_ADAPTERS_H
 
 #include <utility>
 #include <iterator>
 #include <type_traits>
 #include <algorithm>
 
-// Вспомогательные метафункции
+// Проверка, является ли тип парой
 template<typename T>
-struct IsPair : std::false_type {};
+struct IsAssocPair : std::false_type {};
 
 template<typename K, typename V>
-struct IsPair<std::pair<K, V>> : std::true_type {};
+struct IsAssocPair<std::pair<K, V>> : std::true_type {};
 
 template<typename T>
-inline constexpr bool IsPairV = IsPair<T>::value;
+inline constexpr bool IsAssocPairV = IsAssocPair<T>::value;
 
-// Оператор пайплайна
-template<typename Rng, typename Adpt>
-auto operator|(Rng&& rng, Adpt&& adpt) {
-    return std::forward<Adpt>(adpt)(std::forward<Rng>(rng));
+// Пайплайновый оператор
+template<typename Collection, typename Pipe>
+auto operator|(Collection&& src, Pipe&& stage) {
+    return std::forward<Pipe>(stage)(std::forward<Collection>(src));
 }
 
-// Фильтрация
-template<typename Rng, typename Predicate>
-class FilterAdapter {
-    Rng rng_;
-    Predicate pred_;
+// === KeysAdapter ===
+template<typename Coll>
+class MapKeyAdapter {
+    Coll input_;
+
+    using Item = typename std::decay_t<decltype(*std::begin(input_))>;
+    static_assert(IsAssocPairV<Item>, "Keys require range of key-value pairs");
 
 public:
-    FilterAdapter(Rng rng, Predicate pred)
-        : rng_(std::forward<Rng>(rng)), pred_(std::move(pred)) {}
+    MapKeyAdapter(Coll coll) : input_(std::forward<Coll>(coll)) {}
 
-    class Iter {
-        using BaseIter = decltype(std::begin(std::declval<Rng&>()));
-        BaseIter cur_;
-        BaseIter end_;
-        Predicate pred_;
+    class Iterator {
+        using It = decltype(std::begin(std::declval<Coll&>()));
+        It ptr_;
 
-        void SkipInvalid() {
-            while (cur_ != end_ && !pred_(*cur_)) ++cur_;
+    public:
+        Iterator(It p) : ptr_(p) {}
+
+        auto operator*() const { return ptr_->first; }
+        Iterator& operator++() { ++ptr_; return *this; }
+        bool operator!=(const Iterator& rhs) const { return ptr_ != rhs.ptr_; }
+    };
+
+    auto begin() const { return Iterator(std::begin(input_)); }
+    auto end() const { return Iterator(std::end(input_)); }
+};
+
+struct GetKeys {
+    auto operator()() const {
+        return [](auto&& container) {
+            return MapKeyAdapter<decltype(container)>(std::forward<decltype(container)>(container));
+        };
+    }
+};
+
+inline GetKeys get_keys;
+
+// === ValuesAdapter ===
+template<typename Coll>
+class MapValueAdapter {
+    Coll input_;
+
+    using Item = typename std::decay_t<decltype(*std::begin(input_))>;
+    static_assert(IsAssocPairV<Item>, "Values require range of key-value pairs");
+
+public:
+    MapValueAdapter(Coll coll) : input_(std::forward<Coll>(coll)) {}
+
+    class Iterator {
+        using It = decltype(std::begin(std::declval<Coll&>()));
+        It ptr_;
+
+    public:
+        Iterator(It p) : ptr_(p) {}
+
+        decltype(auto) operator*() const { return ptr_->second; }
+        Iterator& operator++() { ++ptr_; return *this; }
+        bool operator!=(const Iterator& rhs) const { return ptr_ != rhs.ptr_; }
+    };
+
+    auto begin() const { return Iterator(std::begin(input_)); }
+    auto end() const { return Iterator(std::end(input_)); }
+};
+
+struct GetValues {
+    auto operator()() const {
+        return [](auto&& container) {
+            return MapValueAdapter<decltype(container)>(std::forward<decltype(container)>(container));
+        };
+    }
+};
+
+inline GetValues get_values;
+
+// === FilterAdapter ===
+template<typename Coll, typename Pred>
+class ConditionalAdapter {
+    Coll input_;
+    Pred condition_;
+
+public:
+    ConditionalAdapter(Coll c, Pred p)
+        : input_(std::forward<Coll>(c)), condition_(std::move(p)) {}
+
+    class Iterator {
+        using It = decltype(std::begin(std::declval<Coll&>()));
+        It curr_;
+        It end_;
+        Pred cond_;
+
+        void Skip() {
+            while (curr_ != end_ && !cond_(*curr_)) ++curr_;
         }
 
     public:
-        Iter(BaseIter begin, BaseIter end, Predicate pred)
-            : cur_(begin), end_(end), pred_(std::move(pred)) {
-            SkipInvalid();
+        Iterator(It start, It finish, Pred pred)
+            : curr_(start), end_(finish), cond_(std::move(pred)) {
+            Skip();
         }
 
-        auto operator*() const { return *cur_; }
-        Iter& operator++() {
-            ++cur_;
-            SkipInvalid();
-            return *this;
-        }
-        bool operator!=(const Iter& other) const {
-            return cur_ != other.cur_;
-        }
+        auto operator*() const { return *curr_; }
+        Iterator& operator++() { ++curr_; Skip(); return *this; }
+        bool operator!=(const Iterator& rhs) const { return curr_ != rhs.curr_; }
     };
 
-    auto begin() const { return Iter(std::begin(rng_), std::end(rng_), pred_); }
-    auto end() const { return Iter(std::end(rng_), std::end(rng_), pred_); }
+    auto begin() const { return Iterator(std::begin(input_), std::end(input_), condition_); }
+    auto end() const { return Iterator(std::end(input_), std::end(input_), condition_); }
 };
 
-struct Filter {
+struct PickIf {
     template<typename Predicate>
-    auto operator()(Predicate&& pred) const {
-        return [pred = std::forward<Predicate>(pred)](auto&& rng) {
-            return FilterAdapter<decltype(rng), std::decay_t<Predicate>>(
-                std::forward<decltype(rng)>(rng),
-                std::move(pred)
-            );
+    auto operator()(Predicate&& cond) const {
+        return [c = std::forward<Predicate>(cond)](auto&& coll) {
+            return ConditionalAdapter<decltype(coll), std::decay_t<Predicate>>(std::forward<decltype(coll)>(coll), std::move(c));
         };
     }
 };
 
-inline Filter filter;
+inline PickIf pick_if;
 
-// Преобразование
-template<typename Rng, typename Function>
-class TransformAdapter {
-    Rng rng_;
-    Function func_;
+// === TransformAdapter ===
+template<typename Coll, typename Func>
+class MapperAdapter {
+    Coll input_;
+    Func transformer_;
 
 public:
-    TransformAdapter(Rng rng, Function func)
-        : rng_(std::forward<Rng>(rng)), func_(std::move(func)) {}
+    MapperAdapter(Coll coll, Func func)
+        : input_(std::forward<Coll>(coll)), transformer_(std::move(func)) {}
 
-    class Iter {
-        using BaseIter = decltype(std::begin(std::declval<Rng&>()));
-        BaseIter it_;
-        Function func_;
+    class Iterator {
+        using It = decltype(std::begin(std::declval<Coll&>()));
+        It iter_;
+        Func func_;
 
     public:
-        Iter(BaseIter it, Function func)
-            : it_(it), func_(std::move(func)) {}
+        Iterator(It i, Func f) : iter_(i), func_(std::move(f)) {}
 
-        auto operator*() const { return func_(*it_); }
-        Iter& operator++() { ++it_; return *this; }
-        bool operator!=(const Iter& other) const { return it_ != other.it_; }
+        auto operator*() const { return func_(*iter_); }
+        Iterator& operator++() { ++iter_; return *this; }
+        bool operator!=(const Iterator& rhs) const { return iter_ != rhs.iter_; }
     };
 
-    auto begin() const { return Iter(std::begin(rng_), func_); }
-    auto end() const { return Iter(std::end(rng_), func_); }
+    auto begin() const { return Iterator(std::begin(input_), transformer_); }
+    auto end() const { return Iterator(std::end(input_), transformer_); }
 };
 
-struct Transform {
-    template<typename Function>
-    auto operator()(Function&& func) const {
-        return [func = std::forward<Function>(func)](auto&& rng) {
-            return TransformAdapter<decltype(rng), std::decay_t<Function>>(
-                std::forward<decltype(rng)>(rng),
-                std::move(func)
-            );
+struct Apply {
+    template<typename Func>
+    auto operator()(Func&& f) const {
+        return [fn = std::forward<Func>(f)](auto&& data) {
+            return MapperAdapter<decltype(data), std::decay_t<Func>>(std::forward<decltype(data)>(data), std::move(fn));
         };
     }
 };
 
-inline Transform transform;
+inline Apply apply;
 
-// Взятие элементов
-template<typename Rng>
-class TakeAdapter {
-    Rng rng_;
-    size_t cnt_;
+// === TakeAdapter ===
+template<typename Coll>
+class HeadAdapter {
+    Coll input_;
+    size_t limit_;
 
 public:
-    TakeAdapter(Rng rng, size_t cnt)
-        : rng_(std::forward<Rng>(rng)), cnt_(cnt) {}
+    HeadAdapter(Coll c, size_t n) : input_(std::forward<Coll>(c)), limit_(n) {}
 
-    class Iter {
-        using BaseIter = decltype(std::begin(std::declval<Rng&>()));
-        BaseIter it_;
-        BaseIter end_;
+    class Iterator {
+        using It = decltype(std::begin(std::declval<Coll&>()));
+        It it_, end_;
         size_t remain_;
 
     public:
-        Iter(BaseIter it, BaseIter end, size_t remain)
-            : it_(it), end_(end), remain_(remain) {}
+        Iterator(It i, It e, size_t r) : it_(i), end_(e), remain_(r) {}
 
         auto operator*() const { return *it_; }
-        Iter& operator++() {
-            ++it_;
-            if (remain_ > 0) --remain_;
-            return *this;
-        }
-        bool operator!=(const Iter& other) const {
-            return it_ != other.it_ && remain_ != other.remain_;
-        }
+        Iterator& operator++() { ++it_; if (remain_) --remain_; return *this; }
+        bool operator!=(const Iterator& rhs) const { return it_ != rhs.it_ && remain_ != rhs.remain_; }
     };
 
-    auto begin() const { return Iter(std::begin(rng_), std::end(rng_), cnt_); }
-    auto end() const { return Iter(std::end(rng_), std::end(rng_), 0); }
+    auto begin() const { return Iterator(std::begin(input_), std::end(input_), limit_); }
+    auto end() const { return Iterator(std::end(input_), std::end(input_), 0); }
 };
 
-struct Take {
-    auto operator()(size_t cnt) const {
-        return [cnt](auto&& rng) {
-            return TakeAdapter<decltype(rng)>(
-                std::forward<decltype(rng)>(rng),
-                cnt
-            );
+struct First {
+    auto operator()(size_t count) const {
+        return [count](auto&& coll) {
+            return HeadAdapter<decltype(coll)>(std::forward<decltype(coll)>(coll), count);
         };
     }
 };
 
-inline Take take;
+inline First first;
 
-// Пропуск элементов
-template<typename Rng>
-class DropAdapter {
-    Rng rng_;
-    size_t cnt_;
+// === DropAdapter ===
+template<typename Coll>
+class SkipAdapter {
+    Coll input_;
+    size_t count_;
 
 public:
-    DropAdapter(Rng rng, size_t cnt)
-        : rng_(std::forward<Rng>(rng)), cnt_(cnt) {}
+    SkipAdapter(Coll c, size_t n) : input_(std::forward<Coll>(c)), count_(n) {}
 
-    class Iter {
-        using BaseIter = decltype(std::begin(std::declval<Rng&>()));
-        BaseIter it_;
-        BaseIter end_;
+    class Iterator {
+        using It = decltype(std::begin(std::declval<Coll&>()));
+        It ptr_, end_;
 
     public:
-        Iter(BaseIter it, BaseIter end)
-            : it_(it), end_(end) {}
+        Iterator(It p, It e) : ptr_(p), end_(e) {}
 
-        auto operator*() const { return *it_; }
-        Iter& operator++() { ++it_; return *this; }
-        bool operator!=(const Iter& other) const { return it_ != other.it_; }
+        auto operator*() const { return *ptr_; }
+        Iterator& operator++() { ++ptr_; return *this; }
+        bool operator!=(const Iterator& rhs) const { return ptr_ != rhs.ptr_; }
     };
 
     auto begin() const {
-        auto it = std::begin(rng_);
-        auto end = std::end(rng_);
-        size_t n = cnt_;
-        while (n-- > 0 && it != end) ++it;
-        return Iter(it, end);
+        auto it = std::begin(input_), end = std::end(input_);
+        size_t n = count_;
+        while (n-- && it != end) ++it;
+        return Iterator(it, end);
     }
 
-    auto end() const { return Iter(std::end(rng_), std::end(rng_)); }
+    auto end() const { return Iterator(std::end(input_), std::end(input_)); }
 };
 
-struct Drop {
-    auto operator()(size_t cnt) const {
-        return [cnt](auto&& rng) {
-            return DropAdapter<decltype(rng)>(
-                std::forward<decltype(rng)>(rng),
-                cnt
-            );
+struct Skip {
+    auto operator()(size_t count) const {
+        return [count](auto&& coll) {
+            return SkipAdapter<decltype(coll)>(std::forward<decltype(coll)>(coll), count);
         };
     }
 };
 
-inline Drop drop;
+inline Skip skip;
 
-// Разворот
-template<typename Rng>
-class ReverseAdapter {
-    Rng rng_;
+// === ReverseAdapter ===
+template<typename Coll>
+class BackwardAdapter {
+    Coll input_;
 
-    using BaseIter = decltype(std::begin(std::declval<Rng&>()));
-    using IterCategory = typename std::iterator_traits<BaseIter>::iterator_category;
+    using BaseIter = decltype(std::begin(std::declval<Coll&>()));
+    using Tag = typename std::iterator_traits<BaseIter>::iterator_category;
 
-    static_assert(
-        std::is_base_of_v<std::bidirectional_iterator_tag, IterCategory>,
-        "Reverse requires bidirectional iterators"
-    );
+    static_assert(std::is_base_of_v<std::bidirectional_iterator_tag, Tag>, "Reverse requires bidirectional iterators");
 
 public:
-    ReverseAdapter(Rng rng)
-        : rng_(std::forward<Rng>(rng)) {}
+    BackwardAdapter(Coll c) : input_(std::forward<Coll>(c)) {}
 
-    auto begin() const { return std::rbegin(rng_); }
-    auto end() const { return std::rend(rng_); }
+    auto begin() const { return std::rbegin(input_); }
+    auto end() const { return std::rend(input_); }
 };
 
-struct Reverse {
+struct Backwards {
     auto operator()() const {
-        return [](auto&& rng) {
-            return ReverseAdapter<decltype(rng)>(
-                std::forward<decltype(rng)>(rng)
-            );
+        return [](auto&& coll) {
+            return BackwardAdapter<decltype(coll)>(std::forward<decltype(coll)>(coll));
         };
     }
 };
 
-inline Reverse reverse;
+inline Backwards backwards;
 
-// Ключи
-template<typename Rng>
-class KeysAdapter {
-    Rng rng_;
-
-    using ValueType = typename std::decay_t<decltype(*std::begin(rng_))>;
-    static_assert(IsPairV<ValueType>, "Keys requires a range of pairs");
-
-public:
-    KeysAdapter(Rng rng)
-        : rng_(std::forward<Rng>(rng)) {}
-
-    class Iter {
-        using BaseIter = decltype(std::begin(std::declval<Rng&>()));
-        BaseIter it_;
-
-    public:
-        Iter(BaseIter it) : it_(it) {}
-
-        auto operator*() const { return it_->first; }
-        Iter& operator++() { ++it_; return *this; }
-        bool operator!=(const Iter& other) const { return it_ != other.it_; }
-    };
-
-    auto begin() const { return Iter(std::begin(rng_)); }
-    auto end() const { return Iter(std::end(rng_)); }
-};
-
-struct Keys {
-    auto operator()() const {
-        return [](auto&& rng) {
-            return KeysAdapter<decltype(rng)>(
-                std::forward<decltype(rng)>(rng)
-            );
-        };
-    }
-};
-
-inline Keys keys;
-
-// Значения
-template<typename Rng>
-class ValuesAdapter {
-    Rng rng_;
-
-    using ValueType = typename std::decay_t<decltype(*std::begin(rng_))>;
-    static_assert(IsPairV<ValueType>, "Values requires a range of pairs");
-
-public:
-    ValuesAdapter(Rng rng)
-        : rng_(std::forward<Rng>(rng)) {}
-
-    class Iter {
-        using BaseIter = decltype(std::begin(std::declval<Rng&>()));
-        BaseIter it_;
-
-    public:
-        Iter(BaseIter it) : it_(it) {}
-
-        decltype(auto) operator*() const { return it_->second; }
-        Iter& operator++() { ++it_; return *this; }
-        bool operator!=(const Iter& other) const { return it_ != other.it_; }
-    };
-
-    auto begin() const { return Iter(std::begin(rng_)); }
-    auto end() const { return Iter(std::end(rng_)); }
-};
-
-struct Values {
-    auto operator()() const {
-        return [](auto&& rng) {
-            return ValuesAdapter<decltype(rng)>(
-                std::forward<decltype(rng)>(rng)
-            );
-        };
-    }
-};
-
-inline Values values;
-
-#endif // ADAPTERS_H
+#endif // LAZY_PIPE_ADAPTERS_H
